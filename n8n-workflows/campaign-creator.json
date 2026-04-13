@@ -1,0 +1,84 @@
+{
+  "name": "Campaign Creator - New Role Detected",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "New Detection Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "parameters": {
+        "path": "new-role-detected",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "id": "fetch-client",
+      "name": "Fetch Client Details from AppSheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appsheet.com/api/v2/apps/617a0b67-5eda-4abe-b2a8-2076a3b56462/tables/Clients/Action",
+        "bodyNote": "Action=Find, filter by ClientID from webhook payload"
+      }
+    },
+    {
+      "id": "create-campaign",
+      "name": "Create Campaign Row in AppSheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appsheet.com/api/v2/apps/617a0b67-5eda-4abe-b2a8-2076a3b56462/tables/Campaigns/Action",
+        "bodyNote": "Action=Add campaign with CurrentStage=Day0, CampaignStatus=Active, NextSendDate=today"
+      }
+    },
+    {
+      "id": "send-day0",
+      "name": "Send Day 0 Email via Outlook 365",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.microsoft.com/v1.0/users/jacob@fcplacements.com/sendMail",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyNote": "Send day0-new-role.html template with client and role variables"
+      }
+    },
+    {
+      "id": "update-campaign",
+      "name": "Update Campaign - Day0 Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appsheet.com/api/v2/apps/617a0b67-5eda-4abe-b2a8-2076a3b56462/tables/Campaigns/Action",
+        "bodyNote": "Action=Edit, set Day0SentAt=now, CurrentStage=Day30, NextSendDate=today+30"
+      }
+    }
+  ],
+  "connections": {
+    "New Detection Webhook": {
+      "main": [[{"node": "Fetch Client Details from AppSheet", "type": "main", "index": 0}]]
+    },
+    "Fetch Client Details from AppSheet": {
+      "main": [[{"node": "Create Campaign Row in AppSheet", "type": "main", "index": 0}]]
+    },
+    "Create Campaign Row in AppSheet": {
+      "main": [[{"node": "Send Day 0 Email via Outlook 365", "type": "main", "index": 0}]]
+    },
+    "Send Day 0 Email via Outlook 365": {
+      "main": [[{"node": "Update Campaign - Day0 Sent", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
