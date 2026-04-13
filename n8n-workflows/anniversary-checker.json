@@ -1,0 +1,87 @@
+{
+  "name": "Placement Anniversary Checker",
+  "nodes": [
+    {
+      "id": "schedule-trigger",
+      "name": "Daily 9AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{"triggerAtHour": 9}]
+        }
+      }
+    },
+    {
+      "id": "fetch-placements",
+      "name": "Fetch Placed Candidates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appsheet.com/api/v2/apps/617a0b67-5eda-4abe-b2a8-2076a3b56462/tables/PlacedCandidates/Action",
+        "sendHeaders": true,
+        "sendBody": true,
+        "contentType": "json",
+        "bodyNote": "Send Action=Find with empty Rows to get all placements"
+      }
+    },
+    {
+      "id": "check-milestones",
+      "name": "Check Milestone Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300],
+      "parameters": {
+        "jsCode": "See README - calculates days since PlacementDate and checks 30/60/90/180/365 milestones"
+      }
+    },
+    {
+      "id": "send-email",
+      "name": "Send Anniversary Email to Jacob",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.microsoft.com/v1.0/users/jacob@fcplacements.com/sendMail",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "contentType": "json"
+      }
+    },
+    {
+      "id": "update-flag",
+      "name": "Update Milestone Flag in AppSheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appsheet.com/api/v2/apps/617a0b67-5eda-4abe-b2a8-2076a3b56462/tables/PlacedCandidates/Action",
+        "sendHeaders": true,
+        "sendBody": true,
+        "bodyNote": "Send Action=Edit to set milestone flag to TRUE"
+      }
+    }
+  ],
+  "connections": {
+    "Daily 9AM Trigger": {
+      "main": [[{"node": "Fetch Placed Candidates", "type": "main", "index": 0}]]
+    },
+    "Fetch Placed Candidates": {
+      "main": [[{"node": "Check Milestone Dates", "type": "main", "index": 0}]]
+    },
+    "Check Milestone Dates": {
+      "main": [[{"node": "Send Anniversary Email to Jacob", "type": "main", "index": 0}]]
+    },
+    "Send Anniversary Email to Jacob": {
+      "main": [[{"node": "Update Milestone Flag in AppSheet", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
