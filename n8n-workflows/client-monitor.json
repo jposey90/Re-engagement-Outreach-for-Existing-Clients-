@@ -1,0 +1,129 @@
+{
+  "name": "Client Job Monitor",
+  "nodes": [
+    {
+      "id": "schedule-trigger",
+      "name": "Daily 7AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{"triggerAtHour": 7}]
+        }
+      }
+    },
+    {
+      "id": "fetch-clients",
+      "name": "Fetch Active Clients from AppSheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appsheet.com/api/v2/apps/617a0b67-5eda-4abe-b2a8-2076a3b56462/tables/Clients/Action",
+        "sendHeaders": true,
+        "sendBody": true,
+        "contentType": "json",
+        "bodyNote": "Action=Find, filter MonitoringEnabled=TRUE and Status=Active"
+      }
+    },
+    {
+      "id": "loop-clients",
+      "name": "Loop Through Clients",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [690, 300],
+      "parameters": {
+        "batchSize": 1
+      }
+    },
+    {
+      "id": "scrape-careers",
+      "name": "Scrape Careers Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$json.CareersURL}}",
+        "options": {
+          "response": {"response": {"fullResponse": true}}
+        }
+      }
+    },
+    {
+      "id": "extract-jobs",
+      "name": "Extract Job Listings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300],
+      "parameters": {
+        "jsCode": "Parse HTML to extract job titles, locations, and URLs from careers page. Normalize title and location. Generate NormalizedKey = clientId|title|location."
+      }
+    },
+    {
+      "id": "check-existing",
+      "name": "Check Existing Detections in AppSheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appsheet.com/api/v2/apps/617a0b67-5eda-4abe-b2a8-2076a3b56462/tables/DetectedRoles/Action",
+        "bodyNote": "Action=Find to check for duplicate NormalizedKey within 30 days"
+      }
+    },
+    {
+      "id": "dedupe-filter",
+      "name": "Filter New Roles Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 300],
+      "parameters": {
+        "jsCode": "Compare extracted jobs against existing detections. Return only jobs with no matching NormalizedKey in last 30 days."
+      }
+    },
+    {
+      "id": "write-detection",
+      "name": "Write New Detection to AppSheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1790, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.appsheet.com/api/v2/apps/617a0b67-5eda-4abe-b2a8-2076a3b56462/tables/DetectedRoles/Action",
+        "bodyNote": "Action=Add new detection row with IsNewRole=TRUE, ReviewStatus=Pending"
+      }
+    }
+  ],
+  "connections": {
+    "Daily 7AM Trigger": {
+      "main": [[{"node": "Fetch Active Clients from AppSheet", "type": "main", "index": 0}]]
+    },
+    "Fetch Active Clients from AppSheet": {
+      "main": [[{"node": "Loop Through Clients", "type": "main", "index": 0}]]
+    },
+    "Loop Through Clients": {
+      "main": [
+        [{"node": "Scrape Careers Page", "type": "main", "index": 0}],
+        [{"node": "Loop Through Clients", "type": "main", "index": 0}]
+      ]
+    },
+    "Scrape Careers Page": {
+      "main": [[{"node": "Extract Job Listings", "type": "main", "index": 0}]]
+    },
+    "Extract Job Listings": {
+      "main": [[{"node": "Check Existing Detections in AppSheet", "type": "main", "index": 0}]]
+    },
+    "Check Existing Detections in AppSheet": {
+      "main": [[{"node": "Filter New Roles Only", "type": "main", "index": 0}]]
+    },
+    "Filter New Roles Only": {
+      "main": [[{"node": "Write New Detection to AppSheet", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
